@@ -150,7 +150,13 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
 
         val pixelColor = bitmap.getPixel(xColor.toInt(), yColor.toInt())
         val hexColor = Integer.toHexString(pixelColor)
-
+        currentItem = when(hexColor){
+            "ffff0000" ->ItemWheel.StringItem(texts[0])
+            "ffffff00" ->ItemWheel.StringItem(texts[1])
+            "ff00ffff" ->ItemWheel.StringItem(texts[2])
+            "ffff00ff" ->ItemWheel.StringItem(texts[3])
+            else -> null
+        }
 
         invalidate()
     }
