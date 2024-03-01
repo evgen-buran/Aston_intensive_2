@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.Bundle
+import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Button
@@ -22,6 +24,8 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
 
     private var imageView: ColorImageView? = null
     private var btnReset: Button? = null
+    private var savedAngle = 0f
+    private var isAnimating = false
 
     private val colors = listOf(
         R.color.red,
@@ -33,10 +37,10 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         R.color.violet,
     )
     private val texts = listOf(
-        "красный",
-        "желтый",
-        "голубой",
-        "фиолетовый"
+        context.getString(R.string.redColor),
+        context.getString(R.string.yellowColor),
+        context.getString(R.string.cyanColor),
+        context.getString(R.string.violetColor)
     )
     private val images = listOf(
         "https://loremflickr.com/640/360",
@@ -69,8 +73,6 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
 
     private var testColorX = 0f
     private var testColorY = 0f
-    private val textPositionX = 0f
-    private val textPositionY = 0f
     private var currentAngle = 0f
     private var spinning = false
     private var stopAngle = 0f
@@ -82,18 +84,33 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
     init {
         setOnClickListener {
             if (!spinning) {
-                spinning = true
-                stopAngle = currentAngle + minRotate + random.nextInt(maxRotate).toFloat()
-                CoroutineScope(Dispatchers.Main).launch {
-                    while (currentAngle < stopAngle) {
-                        currentAngle += 5f
-                        invalidate()
-                        delay(15)
-                    }
-                    spinning = false
-                    showResult()
-                }
+              startAnimation()
             }
+        }
+    }
+
+    override fun onSaveInstanceState(): Parcelable? {
+        return super.onSaveInstanceState()?.let { state ->
+            Bundle().apply {
+                putParcelable("superState", state)
+                putFloat("savedAngle", currentAngle)
+                putBoolean("isAnimating", spinning)
+            }
+        }
+    }
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        var newState = state
+        if (state is Bundle) {
+            savedAngle = state.getFloat("savedAngle", 0f)
+            isAnimating = state.getBoolean("isAnimating", false)
+            newState = state.getParcelable("superState")
+        }
+        super.onRestoreInstanceState(newState)
+    }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isAnimating) {
+            startAnimation()
         }
     }
 
@@ -103,8 +120,6 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         (btnReset as Button).setOnClickListener {
             clearText()
             imageView?.let { clearImageView(it) }
-
-
         }
         imageView = rootView.findViewById(R.id.imageView)
     }
@@ -139,9 +154,8 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
             )
         }
         canvas.drawPath(pointerPath, pointerPaint)
-        // Рисуем текст или загружаем и отображаем изображение над колесом
         if (!spinning && currentItem is ItemWheel.StringItem) {
-            (imageView as ColorImageView).visibility = View.INVISIBLE
+            (imageView as ColorImageView).visibility = INVISIBLE
             val text = (currentItem as ItemWheel.StringItem).value
             canvas.drawRect(
                 centerX - radius * 0.7f,
@@ -160,7 +174,7 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
 
             val imageUrl = (currentItem as ItemWheel.ImgItem).url
             imageView?.let {
-                (imageView as ColorImageView).visibility = View.VISIBLE
+                (imageView as ColorImageView).visibility = VISIBLE
                 Glide.with(context)
                     .load(imageUrl)
                     .into(it)
@@ -184,17 +198,30 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
             "ffff00ff" -> ItemWheel.StringItem(texts[3])
             else -> ItemWheel.ImgItem(images[Random().nextInt(8)])
         }
-
         invalidate()
     }
 
-    fun clearText() {
+    private fun clearText() {
         currentItem = null
         invalidate()
     }
 
-    fun clearImageView(imageView: ColorImageView?) {
+    private fun clearImageView(imageView: ColorImageView?) {
         imageView?.setImageDrawable(null)
+    }
+
+    private fun startAnimation() {
+        spinning = true
+        stopAngle = currentAngle + minRotate + random.nextInt(maxRotate).toFloat()
+        CoroutineScope(Dispatchers.Main).launch {
+            while (currentAngle < stopAngle) {
+                currentAngle += 5f
+                invalidate()
+                delay(15)
+            }
+            spinning = false
+            showResult()
+        }
     }
 
 }
