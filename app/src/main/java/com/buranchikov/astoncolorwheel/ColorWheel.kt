@@ -6,10 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Rect
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
+import android.widget.Button
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import kotlinx.coroutines.CoroutineScope
@@ -21,8 +20,8 @@ import kotlin.math.min
 
 class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    val TAG = "myLog"
     private var imageView: ColorImageView? = null
+    private var btnReset: Button? = null
 
     private val colors = listOf(
         R.color.red,
@@ -57,6 +56,10 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
     }
     private val pointerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
+        style = Paint.Style.FILL
+    }
+    private val rectPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
         style = Paint.Style.FILL
     }
 
@@ -94,18 +97,16 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         }
     }
 
-
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+        btnReset = rootView.findViewById(R.id.btnReset)
+        (btnReset as Button).setOnClickListener {
+            clearText()
+            imageView?.let { clearImageView(it) }
+
+
+        }
         imageView = rootView.findViewById(R.id.imageView)
-        val bounds = Rect()
-        (imageView as ColorImageView).getDrawingRect(bounds)
-        Log.d(TAG, "onLayout: $bounds")
-
-//        textPositionX = bounds.width() / 2
-//        textPositionY = bounds.height() / 2
-
-
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -133,7 +134,7 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
                 centerY + radius,
                 (currentAngle - angle / 2) + i * angle,
                 angle,
-                false,
+                true,
                 arcPaint
             )
         }
@@ -142,6 +143,13 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         if (!spinning && currentItem is ItemWheel.StringItem) {
             (imageView as ColorImageView).visibility = View.INVISIBLE
             val text = (currentItem as ItemWheel.StringItem).value
+            canvas.drawRect(
+                centerX - radius * 0.7f,
+                centerY - radius * 0.1f,
+                centerX + radius * 0.7f,
+                centerY + radius * 0.1f,
+                rectPaint
+            )
             canvas.drawText(
                 text,
                 centerX,
@@ -178,6 +186,15 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         }
 
         invalidate()
+    }
+
+    fun clearText() {
+        currentItem = null
+        invalidate()
+    }
+
+    fun clearImageView(imageView: ColorImageView?) {
+        imageView?.setImageDrawable(null)
     }
 
 }
