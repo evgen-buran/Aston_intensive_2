@@ -6,20 +6,27 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.Bundle
+import android.os.Parcelable
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
+import android.widget.Button
 import androidx.core.content.ContextCompat
+import com.bumptech.glide.Glide
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Random
 import kotlin.math.min
 
 class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
-    val TAG = "myLog"
+
+    private var imageView: ColorImageView? = null
+    private var btnReset: Button? = null
+    private var savedAngle = 0f
+    private var isAnimating = false
+
     private val colors = listOf(
         R.color.red,
         R.color.orange,
@@ -29,11 +36,21 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         R.color.blue,
         R.color.violet,
     )
-    private val texts = listOf("красный", "желтый", "голубой", "фиолетовый")
+    private val texts = listOf(
+        context.getString(R.string.redColor),
+        context.getString(R.string.yellowColor),
+        context.getString(R.string.cyanColor),
+        context.getString(R.string.violetColor)
+    )
     private val images = listOf(
-        R.drawable.img_1,
-        R.drawable.img_2,
-        R.drawable.img_3
+        "https://loremflickr.com/640/360",
+        "https://placekitten.com/640/360",
+        "https://placebear.com/640/360",
+        "https://placebeard.it/640x360",
+        "https://placebeard.it/640/480",
+        "https://loremflickr.com/640/360",
+        "https://baconmockup.com/300/200/",
+        "https://placebeard.it/640x360"
     )
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -45,47 +62,76 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         color = Color.BLACK
         style = Paint.Style.FILL
     }
+    private val rectPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
 
     private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
 
-    var xColor = 0f
-    var yColor = 0f
-
+    private var testColorX = 0f
+    private var testColorY = 0f
     private var currentAngle = 0f
     private var spinning = false
     private var stopAngle = 0f
     private var currentItem: ItemWheel? = null
     private val random = Random()
+    private val minRotate = 120
+    private val maxRotate = 540
 
     init {
         setOnClickListener {
             if (!spinning) {
-                spinning = true
-                stopAngle = currentAngle + random.nextInt(720).toFloat()
-                CoroutineScope(Dispatchers.Main).launch {
-                    while (currentAngle < stopAngle) {
-                        currentAngle += 5f
-                        invalidate()
-                        delay(15)
-                    }
-                    spinning = false
-                    showResult()
-                }
+              startAnimation()
             }
         }
     }
 
+    override fun onSaveInstanceState(): Parcelable? {
+        return super.onSaveInstanceState()?.let { state ->
+            Bundle().apply {
+                putParcelable("superState", state)
+                putFloat("savedAngle", currentAngle)
+                putBoolean("isAnimating", spinning)
+            }
+        }
+    }
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        var newState = state
+        if (state is Bundle) {
+            savedAngle = state.getFloat("savedAngle", 0f)
+            isAnimating = state.getBoolean("isAnimating", false)
+            newState = state.getParcelable("superState")
+        }
+        super.onRestoreInstanceState(newState)
+    }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isAnimating) {
+            startAnimation()
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        btnReset = rootView.findViewById(R.id.btnReset)
+        (btnReset as Button).setOnClickListener {
+            clearText()
+            imageView?.let { clearImageView(it) }
+        }
+        imageView = rootView.findViewById(R.id.imageView)
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val centerX = width / 2f
         val centerY = height / 2f
-        val radius = (min(width, height) / 2) * 0.7f
+        val radius = (min(width, height) / 2) * 0.8f
         val angle = 360f / colors.size
-        xColor = centerX + radius - 5
-        yColor = centerY
+        testColorX = centerX + radius - 5
+        testColorY = centerY
 
         val pointerPath = Path().apply {
             moveTo((centerX + radius + 10), centerY)
@@ -108,60 +154,75 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
             )
         }
         canvas.drawPath(pointerPath, pointerPaint)
-        // Рисуем текст или загружаем и отображаем изображение над колесом
         if (!spinning && currentItem is ItemWheel.StringItem) {
+            (imageView as ColorImageView).visibility = INVISIBLE
             val text = (currentItem as ItemWheel.StringItem).value
+            canvas.drawRect(
+                centerX - radius * 0.7f,
+                centerY - radius * 0.1f,
+                centerX + radius * 0.7f,
+                centerY + radius * 0.1f,
+                rectPaint
+            )
             canvas.drawText(
                 text,
                 centerX,
                 centerY - (textPaint.descent() + textPaint.ascent()) / 2,
                 textPaint
             )
-        } else if (!spinning && currentItem is ItemWheel.IntItem) {
-            val imageIndex = (currentItem as ItemWheel.IntItem).value
-            val drawable = ContextCompat.getDrawable(context, images[imageIndex])
-            drawable?.let {
-                val width = it.intrinsicWidth
-                val height = it.intrinsicHeight
-                val left = (centerX - width / 2).toInt()
-                val top = (centerY - height / 2).toInt()
-                it.setBounds(left, top, left + width, top + height)
-                it.draw(canvas)
-            }
-        }
+        } else if (!spinning && currentItem is ItemWheel.ImgItem) {
 
+            val imageUrl = (currentItem as ItemWheel.ImgItem).url
+            imageView?.let {
+                (imageView as ColorImageView).visibility = VISIBLE
+                Glide.with(context)
+                    .load(imageUrl)
+                    .into(it)
+            }
+
+        }
     }
-//
-//    private fun showResult() {
-//        val index = (stopAngle % 360f / (360f / colors.size)).toInt()
-//        Log.d(TAG, "showResult: $stopAngle - $index")
-//        currentItem = when {
-//            index % 2 == 0 -> ItemWheel.StringItem(texts[index / 2])
-////            else -> ItemWheel.IntItem(index % images.size)
-//            else -> null
-//        }
-//        invalidate()
-//    }
+
 
     private fun showResult() {
         val bitmap = Bitmap.createBitmap(this.width, this.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         this.draw(canvas)
 
-        val pixelColor = bitmap.getPixel(xColor.toInt(), yColor.toInt())
+        val pixelColor = bitmap.getPixel(testColorX.toInt(), testColorY.toInt())
         val hexColor = Integer.toHexString(pixelColor)
-
-
+        currentItem = when (hexColor) {
+            "ffff0000" -> ItemWheel.StringItem(texts[0])
+            "ffffff00" -> ItemWheel.StringItem(texts[1])
+            "ff00ffff" -> ItemWheel.StringItem(texts[2])
+            "ffff00ff" -> ItemWheel.StringItem(texts[3])
+            else -> ItemWheel.ImgItem(images[Random().nextInt(8)])
+        }
         invalidate()
+    }
+
+    private fun clearText() {
+        currentItem = null
+        invalidate()
+    }
+
+    private fun clearImageView(imageView: ColorImageView?) {
+        imageView?.setImageDrawable(null)
+    }
+
+    private fun startAnimation() {
+        spinning = true
+        stopAngle = currentAngle + minRotate + random.nextInt(maxRotate).toFloat()
+        CoroutineScope(Dispatchers.Main).launch {
+            while (currentAngle < stopAngle) {
+                currentAngle += 5f
+                invalidate()
+                delay(15)
+            }
+            spinning = false
+            showResult()
+        }
     }
 
 }
 
-
-//нарисовать метку
-//        оценивать цвет в некоторой точке, напротив метки
-//        по цвету точки, через when присваивать индекс
-//
-//        крутить до 700 градусов
-//        подгружать картинки
-//        создать ползунок

@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Aston Color Wheel</string>
+    <string name="reset">Reset</string>
+    <string name="redColor">красный</string>
+    <string name="yellowColor">желтый</string>
+    <string name="cyanColor">голубой</string>
+    <string name="violetColor">фиолетовый</string>
 </resources>
