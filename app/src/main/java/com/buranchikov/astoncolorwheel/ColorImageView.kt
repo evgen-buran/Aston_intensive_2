@@ -8,6 +8,4 @@ class ColorImageView @JvmOverloads constructor(
     context: Context,
     attributeSet: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : AppCompatImageView(context, attributeSet, defStyleAttr) {
-
-}
+) : AppCompatImageView(context, attributeSet, defStyleAttr)
