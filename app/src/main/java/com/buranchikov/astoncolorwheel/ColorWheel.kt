@@ -6,14 +6,12 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.drawable.Drawable
-import android.transition.Transition
+import android.graphics.Rect
 import android.util.AttributeSet
+import android.util.Log
 import android.view.View
-import android.widget.ImageView
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,12 +22,7 @@ import kotlin.math.min
 class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
     val TAG = "myLog"
-//    private val imageView by find<ImageView>(R.id.imageView)
-//private val imageView: ImageView by lazy {
-//    findViewById(R.id.imageView)
-//}
-
-    private var imageView: ImageView? = null
+    private var imageView: ColorImageView? = null
 
     private val colors = listOf(
         R.color.red,
@@ -40,7 +33,12 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         R.color.blue,
         R.color.violet,
     )
-    private val texts = listOf("красный", "желтый", "голубой", "фиолетовый")
+    private val texts = listOf(
+        "красный",
+        "желтый",
+        "голубой",
+        "фиолетовый"
+    )
     private val images = listOf(
         "https://loremflickr.com/640/360",
         "https://placekitten.com/640/360",
@@ -66,22 +64,23 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         style = Paint.Style.FILL
     }
 
-    var xColor = 0f
-    var yColor = 0f
-
+    private var testColorX = 0f
+    private var testColorY = 0f
+    private val textPositionX = 0f
+    private val textPositionY = 0f
     private var currentAngle = 0f
     private var spinning = false
     private var stopAngle = 0f
     private var currentItem: ItemWheel? = null
     private val random = Random()
+    private val minRotate = 120
+    private val maxRotate = 540
 
     init {
-
         setOnClickListener {
-            imageView = rootView.findViewById(R.id.imageView)
             if (!spinning) {
                 spinning = true
-                stopAngle = currentAngle + random.nextInt(360).toFloat()
+                stopAngle = currentAngle + minRotate + random.nextInt(maxRotate).toFloat()
                 CoroutineScope(Dispatchers.Main).launch {
                     while (currentAngle < stopAngle) {
                         currentAngle += 5f
@@ -96,15 +95,27 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
     }
 
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        imageView = rootView.findViewById(R.id.imageView)
+        val bounds = Rect()
+        (imageView as ColorImageView).getDrawingRect(bounds)
+        Log.d(TAG, "onLayout: $bounds")
+
+//        textPositionX = bounds.width() / 2
+//        textPositionY = bounds.height() / 2
+
+
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val centerX = width / 2f
         val centerY = height / 2f
-        val radius = (min(width, height) / 2) * 0.7f
+        val radius = (min(width, height) / 2) * 0.8f
         val angle = 360f / colors.size
-        xColor = centerX + radius - 5
-        yColor = centerY
+        testColorX = centerX + radius - 5
+        testColorY = centerY
 
         val pointerPath = Path().apply {
             moveTo((centerX + radius + 10), centerY)
@@ -122,13 +133,14 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
                 centerY + radius,
                 (currentAngle - angle / 2) + i * angle,
                 angle,
-                true,
+                false,
                 arcPaint
             )
         }
         canvas.drawPath(pointerPath, pointerPaint)
         // Рисуем текст или загружаем и отображаем изображение над колесом
         if (!spinning && currentItem is ItemWheel.StringItem) {
+            (imageView as ColorImageView).visibility = View.INVISIBLE
             val text = (currentItem as ItemWheel.StringItem).value
             canvas.drawText(
                 text,
@@ -140,6 +152,7 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
 
             val imageUrl = (currentItem as ItemWheel.ImgItem).url
             imageView?.let {
+                (imageView as ColorImageView).visibility = View.VISIBLE
                 Glide.with(context)
                     .load(imageUrl)
                     .into(it)
@@ -154,14 +167,14 @@ class ColorWheel(context: Context, attrs: AttributeSet? = null) : View(context, 
         val canvas = Canvas(bitmap)
         this.draw(canvas)
 
-        val pixelColor = bitmap.getPixel(xColor.toInt(), yColor.toInt())
+        val pixelColor = bitmap.getPixel(testColorX.toInt(), testColorY.toInt())
         val hexColor = Integer.toHexString(pixelColor)
         currentItem = when (hexColor) {
             "ffff0000" -> ItemWheel.StringItem(texts[0])
             "ffffff00" -> ItemWheel.StringItem(texts[1])
             "ff00ffff" -> ItemWheel.StringItem(texts[2])
             "ffff00ff" -> ItemWheel.StringItem(texts[3])
-            else -> ItemWheel.ImgItem(images[Random().nextInt(9)])
+            else -> ItemWheel.ImgItem(images[Random().nextInt(8)])
         }
 
         invalidate()
